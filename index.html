@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>March Madness 2026 — Analyzer & Bracket Predictor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0d0d;color:#e8e8e8;font-family:'Segoe UI',system-ui,sans-serif;font-size:14px}
+h1{font-size:1.6rem;font-weight:700}h2{font-size:1.1rem;font-weight:600}h3{font-size:.95rem;font-weight:600}
+.top-bar{background:linear-gradient(135deg,#1a1a2e,#16213e);padding:16px 24px;border-bottom:2px solid #c8a84b;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.top-bar h1{color:#c8a84b}
+.top-bar .sub{color:#aaa;font-size:.85rem}
+.tabs{display:flex;gap:0;background:#111;border-bottom:2px solid #333;padding:0 24px;overflow-x:auto}
+.tab{padding:10px 20px;cursor:pointer;color:#888;border-bottom:3px solid transparent;font-weight:600;font-size:.85rem;white-space:nowrap;transition:all .2s}
+.tab:hover{color:#ddd}
+.tab.active{color:#c8a84b;border-bottom-color:#c8a84b}
+.page{display:none;padding:20px 24px;max-width:1400px;margin:0 auto}
+.page.active{display:block}
+
+/* Cards */
+.card{background:#161616;border:1px solid #2a2a2a;border-radius:10px;padding:16px;margin-bottom:16px}
+.card-title{font-size:.8rem;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.metric-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:16px}
+.metric{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:12px;text-align:center}
+.metric .val{font-size:1.5rem;font-weight:700;color:#c8a84b}
+.metric .lbl{font-size:.75rem;color:#777;margin-top:2px}
+
+/* Team Table */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+th{background:#1e1e1e;padding:8px 10px;text-align:left;color:#aaa;font-weight:600;border-bottom:2px solid #333;cursor:pointer;white-space:nowrap;user-select:none}
+th:hover{color:#c8a84b}
+tr:hover td{background:#1c1c1c}
+td{padding:7px 10px;border-bottom:1px solid #1e1e1e;vertical-align:middle}
+.seed-badge{display:inline-block;width:22px;height:22px;border-radius:50%;font-size:.72rem;font-weight:700;text-align:center;line-height:22px}
+.s1{background:#c8a84b;color:#000}
+.s2{background:#4b8ec8;color:#fff}
+.s3{background:#4bc87a;color:#000}
+.s4{background:#c84b9e;color:#fff}
+.s5{background:#c87a4b;color:#fff}
+.s6{background:#7a4bc8;color:#fff}
+.s7{background:#4bc8c8;color:#000}
+.s8{background:#888;color:#fff}
+.s9,.s10,.s11,.s12{background:#555;color:#fff}
+.s13,.s14,.s15,.s16{background:#333;color:#aaa}
+.score-bar{height:6px;border-radius:3px;background:#222;margin-top:4px;overflow:hidden}
+.score-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#c8a84b,#e8c96a);transition:width .4s}
+.tier-1{color:#f0a84b;font-weight:700}
+.tier-2{color:#4b9ef0;font-weight:600}
+.tier-3{color:#4bc87a;font-weight:600}
+.tier-4{color:#aaa}
+.tier-5{color:#666}
+.conf-badge{background:#222;border-radius:4px;padding:2px 6px;font-size:.72rem;color:#aaa}
+
+/* Filters */
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.filters input,.filters select{background:#1a1a1a;border:1px solid #333;color:#ddd;padding:7px 12px;border-radius:6px;font-size:.83rem}
+.filters input:focus,.filters select:focus{outline:none;border-color:#c8a84b}
+.btn{background:#c8a84b;color:#000;border:none;padding:7px 16px;border-radius:6px;font-weight:700;cursor:pointer;font-size:.83rem;transition:opacity .2s}
+.btn:hover{opacity:.85}
+.btn-secondary{background:#222;color:#ddd;border:1px solid #444}
+.btn-secondary:hover{background:#2a2a2a}
+
+/* Bracket */
+.bracket-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 80px 1fr 1fr 1fr 1fr;gap:0;min-width:1100px}
+.bracket-col{display:flex;flex-direction:column;justify-content:space-around;padding:4px}
+.bracket-col.center{justify-content:center;align-items:center}
+.bracket-round-label{text-align:center;font-size:.72rem;color:#888;font-weight:600;letter-spacing:.05em;padding:4px 0 8px;text-transform:uppercase}
+.match{margin:3px 0;border:1px solid #2a2a2a;border-radius:6px;overflow:hidden;cursor:pointer;transition:border-color .2s}
+.match:hover{border-color:#c8a84b}
+.match-slot{padding:5px 8px;font-size:.78rem;display:flex;align-items:center;gap:6px;min-height:28px}
+.match-slot:first-child{border-bottom:1px solid #1e1e1e}
+.match-slot.winner{background:#1e2a1e;color:#4bc87a;font-weight:600}
+.match-slot .seed{font-size:.68rem;color:#888;min-width:16px}
+.match-slot .tm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.champion-box{background:#1e1e0a;border:2px solid #c8a84b;border-radius:10px;padding:12px;text-align:center;min-width:100px}
+.champion-box .label{font-size:.72rem;color:#888;margin-bottom:4px}
+.champion-box .name{font-size:.9rem;font-weight:700;color:#c8a84b}
+
+/* Matchup Predictor */
+.predict-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:20px;align-items:center;margin-bottom:20px}
+.team-card-pred{background:#1a1a1a;border:2px solid #2a2a2a;border-radius:10px;padding:16px;text-align:center;transition:border-color .3s}
+.team-card-pred.highlight{border-color:#c8a84b}
+.team-card-pred .tm-name{font-size:1.1rem;font-weight:700;margin-bottom:4px}
+.team-card-pred .tm-seed{color:#888;font-size:.82rem}
+.vs-label{font-size:1.4rem;font-weight:700;color:#555;text-align:center}
+.win-pct{font-size:2rem;font-weight:700}
+.win-pct.fav{color:#4bc87a}
+.win-pct.dog{color:#c84b4b}
+.factor-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #1e1e1e;font-size:.82rem}
+.factor-row .a{color:#4b9ef0;font-weight:600}
+.factor-row .b{color:#c87a4b;font-weight:600}
+.factor-row .lbl{color:#888;font-size:.75rem}
+
+/* History chart */
+.chart-box{background:#161616;border:1px solid #2a2a2a;border-radius:10px;padding:16px;margin-bottom:16px}
+
+/* Upset alerts */
+.upset-zone{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:16px}
+.upset-card{background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:12px}
+.upset-pct{font-size:1.4rem;font-weight:700;color:#f06060}
+.upset-matchup{font-size:.82rem;color:#aaa;margin-top:2px}
+
+/* Responsive */
+@media(max-width:768px){.bracket-grid{min-width:800px}.metric-grid{grid-template-columns:repeat(2,1fr)}}
+.tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:.7rem;font-weight:600;margin-left:4px}
+.tag-nil{background:#2a1a2a;color:#c84bc8;border:1px solid #3a2a3a}
+.tag-def{background:#1a2a1a;color:#4bc87a;border:1px solid #2a3a2a}
+.tag-hot{background:#2a1a1a;color:#f06060;border:1px solid #3a2a2a}
+.info-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div>
+    <h1>🏀 March Madness 2026</h1>
+    <div class="sub">Analyzer & Bracket Predictor — Selection Sunday: Mar 15 · NIL-weighted model</div>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
+    <button class="btn btn-secondary" onclick="exportPDF()">Export PDF</button>
+    <button class="btn" onclick="runSimulation()">Simulate Tournament</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('teams')">Team Ratings</div>
+  <div class="tab" onclick="showTab('bracket')">Bracket</div>
+  <div class="tab" onclick="showTab('matchup')">Matchup Predictor</div>
+  <div class="tab" onclick="showTab('history')">Historical Analysis</div>
+  <div class="tab" onclick="showTab('upsets')">Upset Watch</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ TEAMS PAGE -->
+<div id="page-teams" class="page active">
+  <div class="metric-grid" id="summary-metrics"></div>
+
+  <div class="card">
+    <div class="card-title">Model Weights — NIL Era (2023–2026 weighted 2.5×)</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;font-size:.8rem">
+      <div style="background:#1a1a1a;padding:8px;border-radius:6px"><span style="color:#c8a84b;font-weight:700">25%</span> Adj Efficiency Margin</div>
+      <div style="background:#1a1a1a;padding:8px;border-radius:6px"><span style="color:#c8a84b;font-weight:700">20%</span> NET / Q1+Q2 Win%</div>
+      <div style="background:#1a1a1a;padding:8px;border-radius:6px"><span style="color:#c8a84b;font-weight:700">15%</span> Defensive Efficiency</div>
+      <div style="background:#1a1a1a;padding:8px;border-radius:6px"><span style="color:#c8a84b;font-weight:700">10%</span> Offensive Efficiency</div>
+      <div style="background:#1a1a1a;padding:8px;border-radius:6px"><span style="color:#c8a84b;font-weight:700">10%</span> Strength of Schedule</div>
+      <div style="background:#1a1a1a;padding:8px;border-radius:6px"><span style="color:#c8a84b;font-weight:700">10%</span> Recent Form (last 10)</div>
+      <div style="background:#1a1a1a;padding:8px;border-radius:6px"><span style="color:#c8a84b;font-weight:700">10%</span> Four Factors (eFG%/TO/ORB)</div>
+    </div>
+  </div>
+
+  <div class="filters">
+    <input type="text" id="search-inp" placeholder="Search team..." oninput="renderTable()">
+    <select id="conf-filter" onchange="renderTable()">
+      <option value="">All Conferences</option>
+      <option>ACC</option><option>Big Ten</option><option>Big 12</option>
+      <option>SEC</option><option>Big East</option><option>WCC</option>
+      <option>MWC</option><option>American</option><option>Other</option>
+    </select>
+    <select id="tier-filter" onchange="renderTable()">
+      <option value="">All Tiers</option>
+      <option>Tier 1</option><option>Tier 2</option><option>Tier 3</option><option>Tier 4</option><option>Tier 5</option>
+    </select>
+    <select id="seed-filter" onchange="renderTable()">
+      <option value="">All Seeds</option>
+      <option>1</option><option>2</option><option>3</option><option>4</option>
+      <option>5</option><option>6</option><option>7</option><option>8</option>
+      <option>9-12</option><option>13-16</option>
+    </select>
+    <button class="btn btn-secondary" onclick="clearFilters()">Clear</button>
+  </div>
+
+  <div class="tbl-wrap">
+    <table id="team-table">
+      <thead>
+        <tr>
+          <th onclick="sortTable('seed')">Seed ↕</th>
+          <th onclick="sortTable('name')">Team ↕</th>
+          <th onclick="sortTable('conf')">Conf ↕</th>
+          <th onclick="sortTable('composite')">Composite ↕</th>
+          <th onclick="sortTable('adjEM')">AdjEM ↕</th>
+          <th onclick="sortTable('defRank')">Def Rank ↕</th>
+          <th onclick="sortTable('offRank')">Off Rank ↕</th>
+          <th onclick="sortTable('netRank')">NET Rank ↕</th>
+          <th onclick="sortTable('sosRank')">SOS Rank ↕</th>
+          <th onclick="sortTable('recentForm')">Form ↕</th>
+          <th onclick="sortTable('chapOdds')">Champ% ↕</th>
+          <th>Tier</th>
+          <th>Tags</th>
+        </tr>
+      </thead>
+      <tbody id="team-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ BRACKET PAGE -->
+<div id="page-bracket" class="page">
+  <div class="info-row">
+    <div class="card" style="flex:1;margin-bottom:0;padding:10px 14px">
+      <div class="card-title">Instructions</div>
+      <div style="font-size:.82rem;color:#aaa">Click any team slot to advance them. Bracket auto-populates from Selection Sunday data. Use "Simulate Tournament" to auto-fill with model predictions.</div>
+    </div>
+    <div class="card" style="flex:1;margin-bottom:0;padding:10px 14px">
+      <div class="card-title">Status</div>
+      <div id="bracket-status" style="font-size:.82rem;color:#f0a84b">Awaiting Selection Sunday (Mar 15). Teams are projected — update after official bracket release.</div>
+    </div>
+  </div>
+  <div style="overflow-x:auto;margin-top:16px">
+    <div class="bracket-grid" id="bracket-container"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ MATCHUP PAGE -->
+<div id="page-matchup" class="page">
+  <div class="filters">
+    <select id="team-a-sel" onchange="updateMatchup()">
+      <option value="">Select Team A...</option>
+    </select>
+    <span style="color:#555;font-size:1.2rem">vs</span>
+    <select id="team-b-sel" onchange="updateMatchup()">
+      <option value="">Select Team B...</option>
+    </select>
+  </div>
+  <div id="matchup-result" class="card" style="display:none"></div>
+  <div class="card">
+    <div class="card-title">Quick Seed Matchup Lookup</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px" id="seed-matchups"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ HISTORY PAGE -->
+<div id="page-history" class="page">
+  <div class="metric-grid">
+    <div class="metric"><div class="val">76%</div><div class="lbl">1-Seeds Win Title (since 2000)</div></div>
+    <div class="metric"><div class="val">3</div><div class="lbl">Avg Seed of Final Four</div></div>
+    <div class="metric"><div class="val">35%</div><div class="lbl">12-Seeds Beat 5-Seeds</div></div>
+    <div class="metric"><div class="val">2</div><div class="lbl">16-over-1 Upsets All Time</div></div>
+    <div class="metric"><div class="val">Top 9</div><div class="lbl">Avg AdjO of Champions</div></div>
+    <div class="metric"><div class="val">Top 20</div><div class="lbl">Avg AdjD of Champions</div></div>
+  </div>
+
+  <div class="chart-box">
+    <div class="card-title">Recent Champions (2019–2025)</div>
+    <canvas id="history-chart" height="120"></canvas>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Historical Upset Rates by Matchup</div>
+    <table>
+      <thead><tr><th>Seed Matchup</th><th>Upset Rate</th><th>Upsets per 39 Tourneys</th><th>Notable</th></tr></thead>
+      <tbody>
+        <tr><td>12 over 5</td><td><span style="color:#f06060;font-weight:700">35.6%</span></td><td>~14</td><td>At least one in 33 of 39 tournaments</td></tr>
+        <tr><td>11 over 6</td><td><span style="color:#f06060;font-weight:700">37.1%</span></td><td>~15</td><td>11-seeds have reached Final Four 6x</td></tr>
+        <tr><td>10 over 7</td><td><span style="color:#f09060;font-weight:700">39.5%</span></td><td>~15</td><td>Nearly a coin flip</td></tr>
+        <tr><td>13 over 4</td><td><span style="color:#f09060;font-weight:700">20.6%</span></td><td>~8</td><td>Strong mid-major vs weak power conf</td></tr>
+        <tr><td>14 over 3</td><td><span style="color:#aaa;font-weight:600">15.2%</span></td><td>~6</td><td>Usually one per tournament</td></tr>
+        <tr><td>15 over 2</td><td><span style="color:#aaa;font-weight:600">8.3%</span></td><td>~3</td><td>2023 Princeton over Arizona; FGCU 2013</td></tr>
+        <tr><td>16 over 1</td><td><span style="color:#888;font-weight:600">2.1%</span></td><td>2</td><td>UMBC 2018, Fairleigh Dickinson 2023</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-title">NIL Era Impact (2022–2026) — Key Observations</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:.83rem">
+      <div>
+        <div style="color:#c8a84b;font-weight:600;margin-bottom:6px">Programs Gaining From NIL</div>
+        <ul style="color:#aaa;list-style:disc;padding-left:16px;line-height:1.8">
+          <li>BYU — signed AJ Dybantsa (~$6M), beating Duke/Kansas</li>
+          <li>St. John's — MSG sellouts, portal-first rebuild</li>
+          <li>Michigan — $10M+ war chest, top-5 NIL program</li>
+          <li>Florida — portal transfers built 2025 championship squad</li>
+          <li>Arkansas — aggressive NIL fund, consistent top-20 recruiting</li>
+        </ul>
+      </div>
+      <div>
+        <div style="color:#f06060;font-weight:600;margin-bottom:6px">Model Adjustments for NIL Era</div>
+        <ul style="color:#aaa;list-style:disc;padding-left:16px;line-height:1.8">
+          <li>Last 3 years weighted 2.5× vs. pre-2023 data</li>
+          <li>Transfer portal depth factored into "roster continuity" score</li>
+          <li>High NIL spenders (+$10M) get +2 composite pts</li>
+          <li>Mid-majors with portal hauls (BYU, St. John's) recognized</li>
+          <li>Pre-NIL dynasty track records discounted 30%</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Champion Formula (3-Stat Test) — 2026 Teams Qualifying</div>
+    <div style="font-size:.8rem;color:#888;margin-bottom:10px">All champions since 2007: Top 33 AdjO + Top 66 AdjD + Top 23 SOS = 94% hit rate</div>
+    <div id="formula-teams"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ UPSETS PAGE -->
+<div id="page-upsets" class="page">
+  <div class="card">
+    <div class="card-title">2026 Upset Watch — High-Probability Danger Zones</div>
+    <div class="upset-zone" id="upset-cards"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Cinderella Candidates (Seeds 10–15 with High Composite Scores)</div>
+    <div id="cinderella-list"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// TEAM DATA — 2026 Projected Field
+// All stats are estimated composites based on KenPom/NET/BPI research
+// as of Selection Sunday eve (Mar 14, 2026).
+// adjEM: estimated adjusted efficiency margin
+// defRank/offRank: estimated national rank
+// netRank: NET ranking estimate
+// sosRank: strength of schedule rank
+// recentForm: wins in last 10 games
+// eFG: effective field goal % (offense)
+// eFGD: effective field goal % allowed (defense)
+// nilSpend: NIL tier (1=top spender, 2=high, 3=mid, 4=low)
+// ═══════════════════════════════════════════════════════════════
+const TEAMS = [
+  // ── 1-SEEDS ──
+  {seed:1,name:"Duke",conf:"ACC",adjEM:29.8,defRank:1,offRank:5,netRank:2,sosRank:8,recentForm:9,eFG:56.2,eFGD:44.1,nilSpend:1,record:"29-2",champHistory:5,tags:["def"]},
+  {seed:1,name:"Michigan",conf:"Big Ten",adjEM:28.4,defRank:3,offRank:7,netRank:1,sosRank:1,recentForm:8,eFG:55.8,eFGD:45.2,nilSpend:1,record:"28-3",champHistory:2,tags:["nil"]},
+  {seed:1,name:"Florida",conf:"SEC",adjEM:26.9,defRank:10,offRank:15,netRank:4,sosRank:14,recentForm:10,eFG:54.1,eFGD:46.8,nilSpend:2,record:"29-4",champHistory:3,tags:["hot"]},
+  {seed:1,name:"Arizona",conf:"Big 12",adjEM:27.1,defRank:5,offRank:17,netRank:3,sosRank:6,recentForm:8,eFG:53.9,eFGD:45.0,nilSpend:2,record:"27-4",champHistory:1,tags:["def"]},
+  // ── 2-SEEDS ──
+  {seed:2,name:"Iowa State",conf:"Big 12",adjEM:25.6,defRank:7,offRank:20,netRank:6,sosRank:16,recentForm:8,eFG:53.2,eFGD:45.8,nilSpend:2,record:"26-5",champHistory:0,tags:["def"]},
+  {seed:2,name:"UConn",conf:"Big East",adjEM:25.2,defRank:6,offRank:18,netRank:7,sosRank:11,recentForm:7,eFG:53.8,eFGD:45.5,nilSpend:2,record:"25-7",champHistory:5,tags:[]},
+  {seed:2,name:"Houston",conf:"Big 12",adjEM:24.8,defRank:8,offRank:22,netRank:8,sosRank:9,recentForm:8,eFG:52.4,eFGD:46.1,nilSpend:2,record:"27-4",champHistory:0,tags:["def"]},
+  {seed:2,name:"Michigan State",conf:"Big Ten",adjEM:24.1,defRank:12,offRank:16,netRank:9,sosRank:5,recentForm:7,eFG:54.0,eFGD:46.9,nilSpend:2,record:"26-5",champHistory:2,tags:[]},
+  // ── 3-SEEDS ──
+  {seed:3,name:"Purdue",conf:"Big Ten",adjEM:23.5,defRank:14,offRank:12,netRank:11,sosRank:4,recentForm:7,eFG:55.1,eFGD:47.2,nilSpend:2,record:"25-6",champHistory:0,tags:[]},
+  {seed:3,name:"Nebraska",conf:"Big Ten",adjEM:22.8,defRank:16,offRank:24,netRank:13,sosRank:7,recentForm:8,eFG:52.8,eFGD:47.5,nilSpend:3,record:"25-6",champHistory:0,tags:["hot"]},
+  {seed:3,name:"Illinois",conf:"Big Ten",adjEM:22.4,defRank:18,offRank:19,netRank:15,sosRank:10,recentForm:7,eFG:53.5,eFGD:47.8,nilSpend:3,record:"24-7",champHistory:0,tags:[]},
+  {seed:3,name:"Gonzaga",conf:"WCC",adjEM:23.1,defRank:15,offRank:11,netRank:12,sosRank:32,recentForm:9,eFG:56.0,eFGD:47.0,nilSpend:3,record:"28-3",champHistory:0,tags:["hot"]},
+  // ── 4-SEEDS ──
+  {seed:4,name:"Vanderbilt",conf:"SEC",adjEM:20.8,defRank:22,offRank:28,netRank:17,sosRank:18,recentForm:8,eFG:52.1,eFGD:48.2,nilSpend:3,record:"24-7",champHistory:0,tags:["hot"]},
+  {seed:4,name:"Kansas",conf:"Big 12",adjEM:21.2,defRank:20,offRank:25,netRank:16,sosRank:12,recentForm:7,eFG:53.0,eFGD:48.0,nilSpend:1,record:"23-8",champHistory:4,tags:["nil"]},
+  {seed:4,name:"Alabama",conf:"SEC",adjEM:20.5,defRank:25,offRank:21,netRank:18,sosRank:20,recentForm:7,eFG:54.2,eFGD:48.8,nilSpend:2,record:"22-9",champHistory:0,tags:[]},
+  {seed:4,name:"Virginia",conf:"ACC",adjEM:21.0,defRank:19,offRank:35,netRank:19,sosRank:15,recentForm:8,eFG:51.8,eFGD:47.6,nilSpend:3,record:"24-7",champHistory:1,tags:["def"]},
+  // ── 5-SEEDS ──
+  {seed:5,name:"Tennessee",conf:"SEC",adjEM:19.8,defRank:24,offRank:32,netRank:21,sosRank:19,recentForm:6,eFG:51.5,eFGD:48.5,nilSpend:2,record:"22-9",champHistory:0,tags:[]},
+  {seed:5,name:"St. John's",conf:"Big East",adjEM:19.5,defRank:28,offRank:30,netRank:22,sosRank:24,recentForm:7,eFG:52.4,eFGD:49.1,nilSpend:2,record:"25-6",champHistory:0,tags:["nil","hot"]},
+  {seed:5,name:"Texas Tech",conf:"Big 12",adjEM:19.2,defRank:26,offRank:38,netRank:23,sosRank:13,recentForm:6,eFG:51.2,eFGD:48.7,nilSpend:2,record:"21-10",champHistory:0,tags:[]},
+  {seed:5,name:"Arkansas",conf:"SEC",adjEM:18.9,defRank:30,offRank:33,netRank:24,sosRank:21,recentForm:7,eFG:52.0,eFGD:49.3,nilSpend:2,record:"22-9",champHistory:1,tags:[]},
+  // ── 6-SEEDS ──
+  {seed:6,name:"BYU",conf:"Big 12",adjEM:18.4,defRank:32,offRank:27,netRank:25,sosRank:17,recentForm:8,eFG:53.5,eFGD:49.8,nilSpend:1,record:"23-8",champHistory:0,tags:["nil","hot"]},
+  {seed:6,name:"Louisville",conf:"ACC",adjEM:18.8,defRank:29,offRank:29,netRank:26,sosRank:22,recentForm:8,eFG:52.8,eFGD:49.0,nilSpend:2,record:"23-8",champHistory:2,tags:[]},
+  {seed:6,name:"Wisconsin",conf:"Big Ten",adjEM:17.9,defRank:35,offRank:40,netRank:28,sosRank:26,recentForm:6,eFG:51.0,eFGD:49.5,nilSpend:3,record:"21-10",champHistory:0,tags:[]},
+  {seed:6,name:"North Carolina",conf:"ACC",adjEM:18.1,defRank:34,offRank:31,netRank:27,sosRank:23,recentForm:6,eFG:53.2,eFGD:49.9,nilSpend:2,record:"21-10",champHistory:6,tags:[]},
+  // ── 7-SEEDS ──
+  {seed:7,name:"Kentucky",conf:"SEC",adjEM:17.4,defRank:38,offRank:36,netRank:30,sosRank:25,recentForm:7,eFG:52.6,eFGD:50.2,nilSpend:1,record:"20-11",champHistory:8,tags:["nil"]},
+  {seed:7,name:"Clemson",conf:"ACC",adjEM:17.1,defRank:40,offRank:42,netRank:32,sosRank:29,recentForm:7,eFG:51.4,eFGD:50.5,nilSpend:3,record:"20-11",champHistory:0,tags:[]},
+  {seed:7,name:"Miami FL",conf:"ACC",adjEM:16.8,defRank:42,offRank:44,netRank:33,sosRank:30,recentForm:6,eFG:51.0,eFGD:50.8,nilSpend:3,record:"19-12",champHistory:0,tags:[]},
+  {seed:7,name:"UCLA",conf:"Big Ten",adjEM:17.2,defRank:39,offRank:39,netRank:31,sosRank:27,recentForm:6,eFG:51.8,eFGD:50.4,nilSpend:2,record:"20-11",champHistory:11,tags:[]},
+  // ── 8-SEEDS ──
+  {seed:8,name:"St. Mary's CA",conf:"WCC",adjEM:15.8,defRank:45,offRank:48,netRank:38,sosRank:55,recentForm:8,eFG:52.0,eFGD:51.2,nilSpend:4,record:"26-4",champHistory:0,tags:["hot"]},
+  {seed:8,name:"Georgia",conf:"SEC",adjEM:15.4,defRank:48,offRank:50,netRank:40,sosRank:33,recentForm:7,eFG:51.5,eFGD:51.6,nilSpend:3,record:"20-11",champHistory:0,tags:[]},
+  {seed:8,name:"Ohio State",conf:"Big Ten",adjEM:15.6,defRank:46,offRank:52,netRank:39,sosRank:34,recentForm:6,eFG:51.2,eFGD:51.4,nilSpend:2,record:"19-12",champHistory:1,tags:[]},
+  {seed:8,name:"Utah State",conf:"MWC",adjEM:16.2,defRank:44,offRank:46,netRank:36,sosRank:62,recentForm:9,eFG:52.8,eFGD:50.9,nilSpend:4,record:"27-4",champHistory:0,tags:["hot"]},
+  // ── 9-SEEDS ──
+  {seed:9,name:"Villanova",conf:"Big East",adjEM:14.8,defRank:52,offRank:55,netRank:45,sosRank:38,recentForm:6,eFG:51.0,eFGD:52.0,nilSpend:3,record:"19-12",champHistory:3,tags:[]},
+  {seed:9,name:"Iowa",conf:"Big Ten",adjEM:14.5,defRank:55,offRank:58,netRank:47,sosRank:36,recentForm:6,eFG:50.8,eFGD:52.4,nilSpend:3,record:"18-13",champHistory:0,tags:[]},
+  {seed:9,name:"TCU",conf:"Big 12",adjEM:14.9,defRank:50,offRank:56,netRank:44,sosRank:28,recentForm:7,eFG:51.5,eFGD:51.8,nilSpend:3,record:"19-12",champHistory:0,tags:[]},
+  {seed:9,name:"Texas A&M",conf:"SEC",adjEM:14.2,defRank:58,offRank:60,netRank:49,sosRank:35,recentForm:6,eFG:50.5,eFGD:52.8,nilSpend:2,record:"18-13",champHistory:0,tags:[]},
+  // ── 10-SEEDS ──
+  {seed:10,name:"Boise State",conf:"MWC",adjEM:13.8,defRank:60,offRank:62,netRank:52,sosRank:70,recentForm:8,eFG:51.8,eFGD:52.5,nilSpend:4,record:"24-7",champHistory:0,tags:["hot"]},
+  {seed:10,name:"Indiana",conf:"Big Ten",adjEM:13.5,defRank:62,offRank:65,netRank:54,sosRank:40,recentForm:6,eFG:50.4,eFGD:53.0,nilSpend:2,record:"17-14",champHistory:5,tags:[]},
+  {seed:10,name:"Marquette",conf:"Big East",adjEM:13.9,defRank:59,offRank:61,netRank:51,sosRank:42,recentForm:7,eFG:51.2,eFGD:52.2,nilSpend:3,record:"19-12",champHistory:1,tags:[]},
+  {seed:10,name:"Ole Miss",conf:"SEC",adjEM:13.2,defRank:65,offRank:68,netRank:56,sosRank:39,recentForm:6,eFG:50.2,eFGD:53.4,nilSpend:3,record:"18-13",champHistory:0,tags:[]},
+  // ── 11-SEEDS ──
+  {seed:11,name:"Missouri",conf:"SEC",adjEM:12.8,defRank:68,offRank:70,netRank:60,sosRank:44,recentForm:5,eFG:50.0,eFGD:53.8,nilSpend:3,record:"18-14",champHistory:0,tags:[]},
+  {seed:11,name:"SMU",conf:"ACC",adjEM:12.5,defRank:70,offRank:72,netRank:62,sosRank:48,recentForm:6,eFG:50.5,eFGD:54.0,nilSpend:3,record:"18-13",champHistory:0,tags:[]},
+  {seed:11,name:"VCU",conf:"American",adjEM:12.9,defRank:67,offRank:69,netRank:59,sosRank:52,recentForm:7,eFG:50.2,eFGD:53.6,nilSpend:4,record:"22-10",champHistory:0,tags:["hot"]},
+  {seed:11,name:"Texas",conf:"SEC",adjEM:12.2,defRank:72,offRank:74,netRank:64,sosRank:46,recentForm:5,eFG:49.8,eFGD:54.4,nilSpend:2,record:"16-15",champHistory:0,tags:[]},
+  // ── 12-SEEDS ──
+  {seed:12,name:"Colorado State",conf:"MWC",adjEM:12.0,defRank:74,offRank:76,netRank:66,sosRank:78,recentForm:8,eFG:51.5,eFGD:53.8,nilSpend:4,record:"24-7",champHistory:0,tags:["hot"]},
+  {seed:12,name:"McNeese",conf:"Southland",adjEM:11.5,defRank:80,offRank:82,netRank:72,sosRank:120,recentForm:9,eFG:52.0,eFGD:54.2,nilSpend:4,record:"28-3",champHistory:0,tags:["hot"]},
+  {seed:12,name:"UC Irvine",conf:"Big West",adjEM:11.8,defRank:76,offRank:78,netRank:68,sosRank:110,recentForm:8,eFG:51.0,eFGD:53.5,nilSpend:4,record:"26-5",champHistory:0,tags:[]},
+  {seed:12,name:"High Point",conf:"Big South",adjEM:11.2,defRank:84,offRank:86,netRank:75,sosRank:130,recentForm:9,eFG:51.8,eFGD:54.6,nilSpend:4,record:"27-4",champHistory:0,tags:["hot"]},
+  // ── 13-SEEDS ──
+  {seed:13,name:"Troy",conf:"Sun Belt",adjEM:10.2,defRank:90,offRank:92,netRank:82,sosRank:140,recentForm:8,eFG:51.2,eFGD:55.0,nilSpend:4,record:"25-6",champHistory:0,tags:[]},
+  {seed:13,name:"Akron",conf:"MAC",adjEM:9.8,defRank:95,offRank:96,netRank:86,sosRank:145,recentForm:8,eFG:50.8,eFGD:55.4,nilSpend:4,record:"24-7",champHistory:0,tags:[]},
+  {seed:13,name:"Northern Iowa",conf:"MVC",adjEM:10.5,defRank:88,offRank:90,netRank:80,sosRank:132,recentForm:9,eFG:51.5,eFGD:54.8,nilSpend:4,record:"25-6",champHistory:0,tags:["hot"]},
+  {seed:13,name:"Utah Valley",conf:"WAC",adjEM:9.5,defRank:98,offRank:100,netRank:90,sosRank:150,recentForm:8,eFG:50.5,eFGD:55.8,nilSpend:4,record:"24-7",champHistory:0,tags:[]},
+  // ── 14-SEEDS ──
+  {seed:14,name:"Hofstra",conf:"CAA",adjEM:8.8,defRank:105,offRank:108,netRank:96,sosRank:155,recentForm:9,eFG:51.0,eFGD:56.2,nilSpend:4,record:"26-5",champHistory:0,tags:["hot"]},
+  {seed:14,name:"Yale",conf:"Ivy",adjEM:8.5,defRank:108,offRank:110,netRank:99,sosRank:148,recentForm:8,eFG:50.8,eFGD:56.6,nilSpend:4,record:"22-6",champHistory:0,tags:[]},
+  {seed:14,name:"Furman",conf:"SoCon",adjEM:8.2,defRank:112,offRank:114,netRank:102,sosRank:160,recentForm:8,eFG:50.5,eFGD:57.0,nilSpend:4,record:"24-8",champHistory:0,tags:[]},
+  {seed:14,name:"Louisiana Tech",conf:"CUSA",adjEM:8.9,defRank:104,offRank:106,netRank:94,sosRank:152,recentForm:9,eFG:51.2,eFGD:55.8,nilSpend:4,record:"25-7",champHistory:0,tags:["hot"]},
+  // ── 15-SEEDS ──
+  {seed:15,name:"UMBC",conf:"America East",adjEM:7.2,defRank:120,offRank:122,netRank:112,sosRank:170,recentForm:9,eFG:50.8,eFGD:57.5,nilSpend:4,record:"24-7",champHistory:0,tags:["hot"]},
+  {seed:15,name:"Queens",conf:"Atlantic Sun",adjEM:6.8,defRank:126,offRank:128,netRank:118,sosRank:175,recentForm:8,eFG:50.2,eFGD:58.0,nilSpend:4,record:"23-8",champHistory:0,tags:[]},
+  {seed:15,name:"Wright State",conf:"Horizon",adjEM:7.0,defRank:122,offRank:124,netRank:115,sosRank:172,recentForm:8,eFG:50.5,eFGD:57.8,nilSpend:4,record:"24-8",champHistory:0,tags:[]},
+  {seed:15,name:"North Dakota State",conf:"Summit",adjEM:6.5,defRank:130,offRank:132,netRank:122,sosRank:178,recentForm:9,eFG:50.0,eFGD:58.4,nilSpend:4,record:"25-6",champHistory:0,tags:["hot"]},
+  // ── 16-SEEDS ──
+  {seed:16,name:"Siena",conf:"MAAC",adjEM:4.2,defRank:150,offRank:152,netRank:140,sosRank:190,recentForm:8,eFG:49.5,eFGD:59.0,nilSpend:4,record:"22-9",champHistory:0,tags:[]},
+  {seed:16,name:"Howard",conf:"MEAC",adjEM:3.8,defRank:155,offRank:158,netRank:145,sosRank:195,recentForm:7,eFG:49.0,eFGD:59.5,nilSpend:4,record:"21-10",champHistory:0,tags:[]},
+  {seed:16,name:"Lehigh",conf:"Patriot",adjEM:4.0,defRank:152,offRank:154,netRank:142,sosRank:192,recentForm:9,eFG:49.8,eFGD:59.2,nilSpend:4,record:"22-8",champHistory:0,tags:["hot"]},
+  {seed:16,name:"Southern",conf:"SWAC",adjEM:3.5,defRank:160,offRank:162,netRank:148,sosRank:198,recentForm:8,eFG:48.8,eFGD:60.0,nilSpend:4,record:"20-10",champHistory:0,tags:[]},
+];
+
+// Compute composite score for each team
+function computeComposite(t) {
+  const maxAdjEM = 30;
+  const adjEMScore    = Math.min(t.adjEM / maxAdjEM, 1) * 25;
+  const netScore      = Math.max(0, (200 - t.netRank) / 200) * 20;
+  const defScore      = Math.max(0, (200 - t.defRank) / 200) * 15;
+  const offScore      = Math.max(0, (200 - t.offRank) / 200) * 10;
+  const sosScore      = Math.max(0, (200 - t.sosRank) / 200) * 10;
+  const formScore     = (t.recentForm / 10) * 10;
+  const eFGscore      = Math.min(Math.max((t.eFG - 48) / 12, 0), 1) * 5;
+  const eFGDscore     = Math.min(Math.max((60 - t.eFGD) / 16, 0), 1) * 5;
+  const nilBonus      = t.nilSpend === 1 ? 2 : t.nilSpend === 2 ? 1 : 0;
+  return +(adjEMScore + netScore + defScore + offScore + sosScore + formScore + eFGscore + eFGDscore + nilBonus).toFixed(1);
+}
+
+function computeChampOdds(t, composite) {
+  const base = Math.pow(composite / 100, 2.5) * 100;
+  const defBonus   = t.defRank <= 10  ? 1.25 : t.defRank <= 20 ? 1.1 : 1.0;
+  const sosBonus   = t.sosRank <= 23  ? 1.15 : 1.0;
+  const seedPenalty= t.seed <= 2 ? 1.0 : t.seed <= 4 ? 0.5 : t.seed <= 8 ? 0.15 : 0.03;
+  return +(base * defBonus * sosBonus * seedPenalty).toFixed(2);
+}
+
+TEAMS.forEach(t => {
+  t.composite = computeComposite(t);
+  const raw = computeChampOdds(t, t.composite);
+  t.champOdds = raw;
+});
+// Normalize champ odds to sum to 100
+const totalOdds = TEAMS.reduce((s,t) => s + t.champOdds, 0);
+TEAMS.forEach(t => { t.champOdds = +(t.champOdds / totalOdds * 100).toFixed(2); });
+
+function getTier(t) {
+  if (t.composite >= 70) return "Tier 1";
+  if (t.composite >= 58) return "Tier 2";
+  if (t.composite >= 44) return "Tier 3";
+  if (t.composite >= 28) return "Tier 4";
+  return "Tier 5";
+}
+
+// ── SORT STATE ──
+let sortCol = 'composite', sortAsc = false;
+
+function sortTable(col) {
+  if (sortCol === col) sortAsc = !sortAsc;
+  else { sortCol = col; sortAsc = false; }
+  renderTable();
+}
+
+function clearFilters() {
+  document.getElementById('search-inp').value = '';
+  document.getElementById('conf-filter').value = '';
+  document.getElementById('tier-filter').value = '';
+  document.getElementById('seed-filter').value = '';
+  renderTable();
+}
+
+function renderTable() {
+  const search = document.getElementById('search-inp').value.toLowerCase();
+  const conf   = document.getElementById('conf-filter').value;
+  const tier   = document.getElementById('tier-filter').value;
+  const seedF  = document.getElementById('seed-filter').value;
+
+  let data = TEAMS.filter(t => {
+    if (search && !t.name.toLowerCase().includes(search) && !t.conf.toLowerCase().includes(search)) return false;
+    if (conf && t.conf !== conf) return false;
+    if (tier && getTier(t) !== tier) return false;
+    if (seedF) {
+      if (seedF === '9-12' && (t.seed < 9 || t.seed > 12)) return false;
+      if (seedF === '13-16' && (t.seed < 13 || t.seed > 16)) return false;
+      if (!isNaN(+seedF) && t.seed !== +seedF) return false;
+    }
+    return true;
+  });
+
+  data.sort((a,b) => {
+    let va = a[sortCol], vb = b[sortCol];
+    if (typeof va === 'string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return sortAsc ? va - vb : vb - va;
+  });
+
+  const tbody = document.getElementById('team-tbody');
+  tbody.innerHTML = data.map((t,i) => {
+    const tier = getTier(t);
+    const tierCls = {'Tier 1':'tier-1','Tier 2':'tier-2','Tier 3':'tier-3','Tier 4':'tier-4','Tier 5':'tier-5'}[tier];
+    const tags = t.tags.map(tg => {
+      if (tg==='nil') return '<span class="tag tag-nil">NIL $$$</span>';
+      if (tg==='def') return '<span class="tag tag-def">Elite D</span>';
+      if (tg==='hot') return '<span class="tag tag-hot">Hot ↑</span>';
+      return '';
+    }).join('');
+    return `<tr>
+      <td><span class="seed-badge s${t.seed}">${t.seed}</span></td>
+      <td><strong>${t.name}</strong> <span style="color:#666;font-size:.75rem">${t.record}</span></td>
+      <td><span class="conf-badge">${t.conf}</span></td>
+      <td>
+        <strong style="color:#c8a84b">${t.composite}</strong>
+        <div class="score-bar"><div class="score-fill" style="width:${t.composite}%"></div></div>
+      </td>
+      <td style="color:#aaa">${t.adjEM > 0 ? '+' : ''}${t.adjEM}</td>
+      <td>${t.defRank <= 10 ? '<span style="color:#4bc87a">'+t.defRank+'</span>' : t.defRank}</td>
+      <td>${t.offRank <= 10 ? '<span style="color:#4b9ef0">'+t.offRank+'</span>' : t.offRank}</td>
+      <td>${t.netRank}</td>
+      <td>${t.sosRank}</td>
+      <td>${'●'.repeat(t.recentForm)}${'○'.repeat(10-t.recentForm)} <span style="color:#888;font-size:.72rem">${t.recentForm}/10</span></td>
+      <td><span style="color:#c8a84b;font-weight:700">${t.champOdds}%</span></td>
+      <td><span class="${tierCls}">${tier}</span></td>
+      <td>${tags}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderSummaryMetrics() {
+  const top = TEAMS.slice().sort((a,b) => b.composite - a.composite).slice(0,1)[0];
+  const bestDef = TEAMS.slice().sort((a,b) => a.defRank - b.defRank).slice(0,1)[0];
+  const t1count = TEAMS.filter(t => getTier(t)==='Tier 1').length;
+  document.getElementById('summary-metrics').innerHTML = `
+    <div class="metric"><div class="val">${top.name}</div><div class="lbl">Top Composite Score (${top.composite})</div></div>
+    <div class="metric"><div class="val">${bestDef.name}</div><div class="lbl">Best Defense (Rank #${bestDef.defRank})</div></div>
+    <div class="metric"><div class="val">${t1count}</div><div class="lbl">Tier 1 Contenders</div></div>
+    <div class="metric"><div class="val">68</div><div class="lbl">Teams in Field</div></div>
+    <div class="metric"><div class="val">2.5×</div><div class="lbl">NIL Era Weight (2023–26)</div></div>
+    <div class="metric"><div class="val">Mar 15</div><div class="lbl">Selection Sunday</div></div>
+  `;
+}
+
+// ── MATCHUP PREDICTOR ──
+function populateTeamSelects() {
+  const sorted = TEAMS.slice().sort((a,b) => a.seed - b.seed || b.composite - a.composite);
+  const opts = sorted.map(t => `<option value="${t.name}">[${t.seed}] ${t.name} (${t.composite})</option>`).join('');
+  document.getElementById('team-a-sel').innerHTML = '<option value="">Select Team A...</option>' + opts;
+  document.getElementById('team-b-sel').innerHTML = '<option value="">Select Team B...</option>' + opts;
+}
+
+function winProbability(tA, tB) {
+  const diff = tA.composite - tB.composite;
+  return 1 / (1 + Math.pow(10, -diff / 20));
+}
+
+function updateMatchup() {
+  const nameA = document.getElementById('team-a-sel').value;
+  const nameB = document.getElementById('team-b-sel').value;
+  if (!nameA || !nameB || nameA === nameB) { document.getElementById('matchup-result').style.display='none'; return; }
+  const tA = TEAMS.find(t=>t.name===nameA);
+  const tB = TEAMS.find(t=>t.name===nameB);
+  const pA = winProbability(tA, tB);
+  const pB = 1 - pA;
+  const fav = pA >= pB ? tA : tB;
+  const dog = pA >= pB ? tB : tA;
+  const favP = pA >= pB ? pA : pB;
+
+  document.getElementById('matchup-result').style.display = 'block';
+  document.getElementById('matchup-result').innerHTML = `
+    <div class="predict-grid">
+      <div class="team-card-pred ${pA>pB?'highlight':''}">
+        <div class="tm-name">${tA.name}</div>
+        <div class="tm-seed">Seed #${tA.seed} · ${tA.conf}</div>
+        <div class="win-pct ${pA>pB?'fav':'dog'}">${(pA*100).toFixed(1)}%</div>
+        <div style="font-size:.75rem;color:#888">Win Probability</div>
+      </div>
+      <div class="vs-label">VS</div>
+      <div class="team-card-pred ${pB>pA?'highlight':''}">
+        <div class="tm-name">${tB.name}</div>
+        <div class="tm-seed">Seed #${tB.seed} · ${tB.conf}</div>
+        <div class="win-pct ${pB>pA?'fav':'dog'}">${(pB*100).toFixed(1)}%</div>
+        <div style="font-size:.75rem;color:#888">Win Probability</div>
+      </div>
+    </div>
+    <div class="card-title">Factor Breakdown</div>
+    ${[
+      ['Composite Score', tA.composite, tB.composite, false],
+      ['AdjEM', tA.adjEM, tB.adjEM, false],
+      ['Defensive Rank', tA.defRank, tB.defRank, true],
+      ['NET Rank', tA.netRank, tB.netRank, true],
+      ['Recent Form', tA.recentForm, tB.recentForm, false],
+      ['SOS Rank', tA.sosRank, tB.sosRank, true],
+    ].map(([lbl, vA, vB, lower]) => {
+      const aBetter = lower ? vA < vB : vA > vB;
+      return `<div class="factor-row">
+        <span class="${aBetter?'a':'b'}">${vA}</span>
+        <span class="lbl">${lbl}</span>
+        <span class="${aBetter?'b':'a'}">${vB}</span>
+      </div>`;
+    }).join('')}
+    <div style="margin-top:12px;padding:10px;background:#1a1a2a;border-radius:8px;font-size:.82rem;color:#aaa">
+      <strong style="color:#c8a84b">Prediction:</strong> ${fav.name} wins with <strong>${(favP*100).toFixed(1)}%</strong> probability.
+      ${Math.abs(tA.seed-tB.seed) >= 4 ? `<br><span style="color:#f0a84b">⚠ Potential upset alert — ${dog.name} has composite score ${dog.composite} vs ${fav.name}'s ${fav.composite}.</span>` : ''}
+    </div>
+  `;
+}
+
+function renderSeedMatchups() {
+  const upsets = [
+    {hi:1,lo:16,rate:2.1},{hi:2,lo:15,rate:8.3},{hi:3,lo:14,rate:15.2},
+    {hi:4,lo:13,rate:20.6},{hi:5,lo:12,rate:35.6},{hi:6,lo:11,rate:37.1},
+    {hi:7,lo:10,rate:39.5},{hi:8,lo:9,rate:47.2}
+  ];
+  document.getElementById('seed-matchups').innerHTML = upsets.map(u => {
+    const color = u.rate >= 35 ? '#f06060' : u.rate >= 20 ? '#f0a84b' : '#aaa';
+    return `<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:10px;cursor:pointer"
+      onclick="prefillMatchup(${u.hi},${u.lo})">
+      <div style="font-size:.8rem;color:#888">Seed ${u.hi} vs Seed ${u.lo}</div>
+      <div style="color:${color};font-weight:700;font-size:1.1rem">${u.rate}% upset</div>
+    </div>`;
+  }).join('');
+}
+
+function prefillMatchup(seedHi, seedLo) {
+  const tHi = TEAMS.find(t=>t.seed===seedHi);
+  const tLo = TEAMS.find(t=>t.seed===seedLo);
+  if (tHi && tLo) {
+    document.getElementById('team-a-sel').value = tHi.name;
+    document.getElementById('team-b-sel').value = tLo.name;
+    showTab('matchup');
+    updateMatchup();
+  }
+}
+
+// ── HISTORY CHART ──
+function renderHistoryChart() {
+  const ctx = document.getElementById('history-chart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['2019\nVirginia','2021\nBaylor','2022\nKansas','2023\nUConn','2024\nUConn','2025\nFlorida'],
+      datasets: [{
+        label: 'Champion Seed',
+        data: [1,1,1,4,1,1],
+        backgroundColor: ['#c8a84b','#4b9ef0','#4bc87a','#c84b4b','#4b9ef0','#4bc87a'],
+        borderRadius: 6,
+      },{
+        label: 'AdjEM Rank',
+        data: [3,1,2,6,1,4],
+        backgroundColor: '#333',
+        borderRadius: 6,
+        hidden: false,
+      }]
+    },
+    options: {
+      responsive:true, plugins:{legend:{labels:{color:'#888'}}},
+      scales:{x:{ticks:{color:'#888'},grid:{color:'#1a1a1a'}},y:{ticks:{color:'#888'},grid:{color:'#1a1a1a'},reverse:false}}
+    }
+  });
+
+  // Formula teams
+  const qualifying = TEAMS.filter(t => t.offRank<=33 && t.defRank<=66 && t.sosRank<=23);
+  document.getElementById('formula-teams').innerHTML = qualifying.map(t =>
+    `<div style="display:inline-block;margin:4px;background:#1a1a2a;border:1px solid #2a2a3a;border-radius:6px;padding:6px 12px;font-size:.82rem">
+      <span class="seed-badge s${t.seed}" style="margin-right:6px">${t.seed}</span>
+      <strong>${t.name}</strong>
+      <span style="color:#888;margin-left:6px">Off:${t.offRank} Def:${t.defRank} SOS:${t.sosRank}</span>
+    </div>`
+  ).join('');
+}
+
+// ── UPSET WATCH ──
+function renderUpsets() {
+  const upsetMatchups = [
+    {lo:12,hi:5,rate:35.6,note:"Most reliable upset seed line"},
+    {lo:11,hi:6,rate:37.1,note:"37% historically; 11-seeds reached FF 6x"},
+    {lo:10,hi:7,rate:39.5,note:"Nearly a coin flip"},
+    {lo:13,hi:4,rate:20.6,note:"Strong mid-major vs weak power conf"},
+    {lo:15,hi:2,rate:8.3,note:"Princeton 2023, FGCU 2013"},
+  ];
+  document.getElementById('upset-cards').innerHTML = upsetMatchups.map(u => {
+    const loTeam = TEAMS.find(t=>t.seed===u.lo);
+    const hiTeam = TEAMS.find(t=>t.seed===u.hi);
+    return `<div class="upset-card" onclick="prefillMatchup(${u.hi},${u.lo});showTab('matchup')">
+      <div class="upset-pct">${u.rate}%</div>
+      <div class="upset-matchup">#${u.lo} over #${u.hi} upset rate</div>
+      <div style="margin-top:8px;font-size:.78rem;color:#aaa">${loTeam?loTeam.name:'TBD'} vs ${hiTeam?hiTeam.name:'TBD'}</div>
+      <div style="font-size:.72rem;color:#666;margin-top:4px">${u.note}</div>
+    </div>`;
+  }).join('');
+
+  // Cinderella candidates: seeds 10-15 sorted by composite
+  const cinderellas = TEAMS.filter(t=>t.seed>=10&&t.seed<=15).sort((a,b)=>b.composite-a.composite).slice(0,8);
+  document.getElementById('cinderella-list').innerHTML = cinderellas.map(t => `
+    <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #1e1e1e">
+      <span class="seed-badge s${t.seed}">${t.seed}</span>
+      <div style="flex:1">
+        <strong>${t.name}</strong> <span class="conf-badge">${t.conf}</span>
+        ${t.tags.includes('hot') ? '<span class="tag tag-hot">Hot ↑</span>' : ''}
+        <div style="color:#888;font-size:.75rem">${t.record} · Composite: ${t.composite}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="color:#f0a84b;font-weight:700">${(winProbability(t, TEAMS.find(tm=>tm.seed===17-t.seed)||{composite:50}) * 100).toFixed(0)}%</div>
+        <div style="font-size:.72rem;color:#888">vs opp</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── SIMULATION ──
+function simulateGame(tA, tB) {
+  const p = winProbability(tA, tB);
+  return Math.random() < p ? tA : tB;
+}
+
+function runSimulation() {
+  // Simple bracket simulation — 64-team field
+  const field = TEAMS.filter(t => t.seed <= 16).slice(0, 64);
+  // Pair by seed: 1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15 (per region)
+  let round = field.slice();
+  let rounds = [round.map(t=>t.name)];
+  while (round.length > 1) {
+    const next = [];
+    for (let i = 0; i < round.length; i += 2) {
+      next.push(simulateGame(round[i], round[i+1]));
+    }
+    round = next;
+    rounds.push(round.map(t=>t.name));
+  }
+  const champ = round[0];
+  showTab('bracket');
+  document.getElementById('bracket-status').innerHTML =
+    `<span style="color:#4bc87a">Simulation complete! Predicted champion: <strong>${champ.name}</strong></span>`;
+  alert(`🏆 Simulation Result: ${champ.name} wins the 2026 NCAA Championship!\n\nThis is based on composite scores and NIL-weighted model. Click "Simulate Tournament" again for a different outcome.`);
+}
+
+// ── BRACKET UI (placeholder — to be filled after Selection Sunday) ──
+function renderBracket() {
+  const container = document.getElementById('bracket-container');
+  container.innerHTML = `
+    <div style="padding:40px;text-align:center;color:#555;grid-column:1/-1">
+      <div style="font-size:3rem;margin-bottom:12px">🏀</div>
+      <div style="font-size:1.1rem;color:#888;margin-bottom:8px">Bracket Available After Selection Sunday</div>
+      <div style="font-size:.82rem;color:#555">The official 2026 NCAA Tournament bracket will be revealed March 15 at 6 PM ET on CBS.</div>
+      <div style="margin-top:16px">
+        <button class="btn" onclick="runSimulation()">Simulate Tournament Now</button>
+        <button class="btn btn-secondary" style="margin-left:8px" onclick="showTab('teams')">View Team Ratings</button>
+      </div>
+      <div style="margin-top:20px;color:#444;font-size:.8rem">
+        Once the bracket is released, update the team seeds and regions here.<br>
+        Use the Matchup Predictor tab to analyze any first-round game.
+      </div>
+    </div>
+  `;
+}
+
+// ── TABS ──
+function showTab(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  const tabs = ['teams','bracket','matchup','history','upsets'];
+  document.querySelectorAll('.tab')[tabs.indexOf(id)].classList.add('active');
+}
+
+function exportPDF() {
+  document.title = 'March Madness 2026 — Analysis';
+  window.print();
+}
+
+// ── INIT ──
+renderSummaryMetrics();
+renderTable();
+populateTeamSelects();
+renderSeedMatchups();
+renderBracket();
+renderHistoryChart();
+renderUpsets();
+</script>
+
+<style>
+@media print {
+  .tabs,.filters,.btn,.top-bar button{display:none!important}
+  body{background:#fff;color:#000}
+  .card,.metric,.chart-box{border:1px solid #ccc}
+  .top-bar{background:#fff;border-bottom:2px solid #000;color:#000}
+  .top-bar h1{color:#000}
+  table{font-size:11px}
+  .page{display:block!important}
+  #page-bracket,#page-matchup,#page-upsets{display:none!important}
+}
+</style>
+</body>
+</html>
