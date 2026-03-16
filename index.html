@@ -204,12 +204,10 @@ td{padding:7px 10px;border-bottom:1px solid #1e1e1e;vertical-align:middle}
     </div>
     <div class="card" style="flex:1;margin-bottom:0;padding:10px 14px">
       <div class="card-title">Status</div>
-      <div id="bracket-status" style="font-size:.82rem;color:#f0a84b">Awaiting Selection Sunday (Mar 15). Teams are projected — update after official bracket release.</div>
+      <div id="bracket-status" style="font-size:.82rem;color:#4bc87a">Official 2026 bracket loaded. Click any team to advance them. Use "Simulate Tournament" to auto-fill with model predictions.</div>
     </div>
   </div>
-  <div style="overflow-x:auto;margin-top:16px">
-    <div class="bracket-grid" id="bracket-container"></div>
-  </div>
+  <div style="margin-top:12px" id="bracket-container"></div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════ MATCHUP PAGE -->
@@ -401,7 +399,20 @@ const TEAMS = [
   {seed:16,name:"Siena",conf:"MAAC",adjEM:4.2,defRank:150,offRank:152,netRank:140,sosRank:190,recentForm:8,eFG:49.5,eFGD:59.0,nilSpend:4,record:"22-9",champHistory:0,tags:[]},
   {seed:16,name:"Howard",conf:"MEAC",adjEM:3.8,defRank:155,offRank:158,netRank:145,sosRank:195,recentForm:7,eFG:49.0,eFGD:59.5,nilSpend:4,record:"21-10",champHistory:0,tags:[]},
   {seed:16,name:"Lehigh",conf:"Patriot",adjEM:4.0,defRank:152,offRank:154,netRank:142,sosRank:192,recentForm:9,eFG:49.8,eFGD:59.2,nilSpend:4,record:"22-8",champHistory:0,tags:["hot"]},
-  {seed:16,name:"Southern",conf:"SWAC",adjEM:3.5,defRank:160,offRank:162,netRank:148,sosRank:198,recentForm:8,eFG:48.8,eFGD:60.0,nilSpend:4,record:"20-10",champHistory:0,tags:[]},
+  {seed:16,name:"LIU",conf:"CAA",adjEM:4.1,defRank:151,offRank:153,netRank:141,sosRank:191,recentForm:8,eFG:49.6,eFGD:59.1,nilSpend:4,record:"21-10",champHistory:0,tags:[]},
+  {seed:16,name:"Prairie View A&M",conf:"SWAC",adjEM:3.6,defRank:158,offRank:160,netRank:147,sosRank:196,recentForm:9,eFG:48.9,eFGD:59.8,nilSpend:4,record:"21-9",champHistory:0,tags:["hot"]},
+  // ── ADDITIONAL BRACKET TEAMS ──
+  {seed:10,name:"UCF",conf:"Big 12",adjEM:13.4,defRank:63,offRank:66,netRank:55,sosRank:41,recentForm:7,eFG:50.6,eFGD:53.1,nilSpend:3,record:"19-13",champHistory:0,tags:[]},
+  {seed:9,name:"Saint Louis",conf:"A-10",adjEM:14.0,defRank:57,offRank:59,netRank:48,sosRank:60,recentForm:7,eFG:51.2,eFGD:52.6,nilSpend:4,record:"22-10",champHistory:0,tags:[]},
+  {seed:13,name:"Cal Baptist",conf:"WAC",adjEM:10.0,defRank:92,offRank:94,netRank:84,sosRank:138,recentForm:8,eFG:51.0,eFGD:55.2,nilSpend:4,record:"24-8",champHistory:0,tags:[]},
+  {seed:13,name:"Hawaii",conf:"Big West",adjEM:9.6,defRank:97,offRank:98,netRank:88,sosRank:142,recentForm:8,eFG:50.6,eFGD:55.6,nilSpend:4,record:"23-9",champHistory:0,tags:[]},
+  {seed:14,name:"Kennesaw State",conf:"ASUN",adjEM:8.6,defRank:107,offRank:109,netRank:98,sosRank:158,recentForm:8,eFG:50.6,eFGD:56.4,nilSpend:4,record:"23-8",champHistory:0,tags:[]},
+  {seed:14,name:"Penn",conf:"Ivy",adjEM:8.4,defRank:110,offRank:112,netRank:100,sosRank:150,recentForm:7,eFG:50.7,eFGD:56.8,nilSpend:4,record:"20-8",champHistory:0,tags:[]},
+  {seed:15,name:"Tennessee State",conf:"OVC",adjEM:6.9,defRank:123,offRank:125,netRank:116,sosRank:173,recentForm:9,eFG:50.4,eFGD:57.9,nilSpend:4,record:"23-8",champHistory:0,tags:["hot"]},
+  {seed:15,name:"Idaho",conf:"Big Sky",adjEM:6.6,defRank:128,offRank:130,netRank:120,sosRank:176,recentForm:8,eFG:50.1,eFGD:58.2,nilSpend:4,record:"22-9",champHistory:0,tags:[]},
+  {seed:11,name:"NC State",conf:"ACC",adjEM:12.1,defRank:71,offRank:73,netRank:63,sosRank:47,recentForm:6,eFG:50.3,eFGD:54.1,nilSpend:3,record:"17-15",champHistory:1,tags:[]},
+  {seed:11,name:"Miami OH",conf:"MAC",adjEM:11.8,defRank:75,offRank:77,netRank:67,sosRank:115,recentForm:7,eFG:50.8,eFGD:53.9,nilSpend:4,record:"21-11",champHistory:0,tags:[]},
+  {seed:11,name:"South Florida",conf:"American",adjEM:12.0,defRank:73,offRank:75,netRank:65,sosRank:53,recentForm:6,eFG:50.1,eFGD:54.0,nilSpend:4,record:"20-12",champHistory:0,tags:[]},
 ];
 
 // Compute composite score for each team
@@ -697,51 +708,213 @@ function renderUpsets() {
   `).join('');
 }
 
-// ── SIMULATION ──
-function simulateGame(tA, tB) {
-  const p = winProbability(tA, tB);
-  return Math.random() < p ? tA : tB;
+// ── OFFICIAL 2026 BRACKET DATA ──
+// Order per region: [seed,name] pairs in game order: 1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15
+const BRACKET_SEEDS = [
+  // East
+  [[1,"Duke"],[16,"Siena"],[8,"Ohio State"],[9,"TCU"],[5,"St. John's"],[12,"N Iowa"],[4,"Kansas"],[13,"Cal Baptist"],
+   [6,"Louisville"],[11,"S Florida"],[3,"Michigan St"],[14,"N Dakota St"],[7,"UCLA"],[10,"UCF"],[2,"UConn"],[15,"Furman"]],
+  // West
+  [[1,"Arizona"],[16,"LIU"],[8,"Villanova"],[9,"Utah State"],[5,"Wisconsin"],[12,"High Point"],[4,"Arkansas"],[13,"Hawaii"],
+   [6,"BYU"],[11,"TX/NC St"],[3,"Gonzaga"],[14,"Kennesaw St"],[7,"Miami FL"],[10,"Missouri"],[2,"Purdue"],[15,"Queens"]],
+  // South
+  [[1,"Florida"],[16,"PVA&M/Lehigh"],[8,"Clemson"],[9,"Iowa"],[5,"Vanderbilt"],[12,"McNeese"],[4,"Nebraska"],[13,"Troy"],
+   [6,"N Carolina"],[11,"VCU"],[3,"Illinois"],[14,"Penn"],[7,"St. Mary's"],[10,"Texas A&M"],[2,"Houston"],[15,"Idaho"]],
+  // Midwest
+  [[1,"Michigan"],[16,"UMBC/Howard"],[8,"Georgia"],[9,"Saint Louis"],[5,"Texas Tech"],[12,"Akron"],[4,"Alabama"],[13,"Hofstra"],
+   [6,"Tennessee"],[11,"SMU/Miami OH"],[3,"Virginia"],[14,"Wright State"],[7,"Kentucky"],[10,"Santa Clara"],[2,"Iowa State"],[15,"Tenn State"]],
+];
+const REGION_NAMES = ['East','West','South','Midwest'];
+const REGION_COLORS = ['#4b9ef0','#c84bc8','#4bc87a','#f0a84b'];
+
+// bW[region][round][game] = winning team name or null
+// rounds: 0=R64(8 games), 1=R32(4), 2=S16(2), 3=E8(1)
+let bW = Array.from({length:4}, () => [[null,null,null,null,null,null,null,null],[null,null,null,null],[null,null],[null]]);
+let ffW = [null, null]; // FF[0]=East vs West, FF[1]=South vs Midwest
+let champW = null;
+
+function getR64Teams(region, game) {
+  return [BRACKET_SEEDS[region][game*2], BRACKET_SEEDS[region][game*2+1]];
+}
+function getMatchupTeams(region, round, game) {
+  if (round === 0) return getR64Teams(region, game);
+  const prev = round - 1;
+  return [[null, bW[region][prev][game*2]||'TBD'], [null, bW[region][prev][game*2+1]||'TBD']];
+}
+function getTeamData(name) {
+  return TEAMS.find(t => t.name === name || name.startsWith(t.name.substring(0,6))) || {composite:25, seed:16};
+}
+function getSeedColor(s) {
+  if (!s) return '#888';
+  if (s<=2) return '#c8a84b'; if (s<=4) return '#4b9ef0';
+  if (s<=6) return '#4bc87a'; if (s<=8) return '#888'; return '#555';
 }
 
-function runSimulation() {
-  // Simple bracket simulation — 64-team field
-  const field = TEAMS.filter(t => t.seed <= 16).slice(0, 64);
-  // Pair by seed: 1v16, 8v9, 5v12, 4v13, 6v11, 3v14, 7v10, 2v15 (per region)
-  let round = field.slice();
-  let rounds = [round.map(t=>t.name)];
-  while (round.length > 1) {
-    const next = [];
-    for (let i = 0; i < round.length; i += 2) {
-      next.push(simulateGame(round[i], round[i+1]));
-    }
-    round = next;
-    rounds.push(round.map(t=>t.name));
+function pickWinner(region, round, game, teamName) {
+  bW[region][round][game] = teamName;
+  clearDownstream(region, round + 1, Math.floor(game / 2));
+  if (round === 3) {
+    if (ffW[0] && ffW[0] !== bW[0][3][0] && ffW[0] !== bW[1][3][0]) ffW[0] = null;
+    if (ffW[1] && ffW[1] !== bW[2][3][0] && ffW[1] !== bW[3][3][0]) ffW[1] = null;
+    if (champW && champW !== ffW[0] && champW !== ffW[1]) champW = null;
   }
-  const champ = round[0];
-  showTab('bracket');
+  renderBracket();
+}
+function clearDownstream(region, round, game) {
+  if (round > 3) return;
+  bW[region][round][game] = null;
+  clearDownstream(region, round + 1, Math.floor(game / 2));
+}
+function pickFF(game, teamName) {
+  ffW[game] = teamName;
+  if (champW && champW !== ffW[0] && champW !== ffW[1]) champW = null;
+  renderBracket();
+}
+function pickChamp(teamName) {
+  champW = teamName;
   document.getElementById('bracket-status').innerHTML =
-    `<span style="color:#4bc87a">Simulation complete! Predicted champion: <strong>${champ.name}</strong></span>`;
-  alert(`🏆 Simulation Result: ${champ.name} wins the 2026 NCAA Championship!\n\nThis is based on composite scores and NIL-weighted model. Click "Simulate Tournament" again for a different outcome.`);
+    `<span style="color:#c8a84b">Your pick: <strong>🏆 ${champW}</strong> wins the 2026 NCAA Championship!</span>`;
+  renderBracket();
 }
 
-// ── BRACKET UI (placeholder — to be filled after Selection Sunday) ──
+function renderMatchupBox(region, round, game) {
+  const teams = getMatchupTeams(region, round, game);
+  const winner = bW[region][round][game];
+  return teams.map((mt, i) => {
+    const tname = mt[1] || 'TBD', tseed = mt[0];
+    const isWin = winner === tname;
+    const canPick = tname !== 'TBD' && teams[0][1] !== 'TBD' && teams[1][1] !== 'TBD';
+    return `<div onclick="${canPick ? `pickWinner(${region},${round},${game},'${tname.replace(/'/g,"\\'")}')` : 'void(0)'}"
+      style="padding:4px 7px;font-size:.72rem;display:flex;align-items:center;gap:4px;
+             cursor:${canPick ? 'pointer' : 'default'};
+             background:${isWin ? '#1a2a1a' : 'transparent'};
+             color:${isWin ? '#4bc87a' : tname === 'TBD' ? '#383838' : '#ccc'};
+             ${i === 0 ? 'border-bottom:1px solid #1e1e1e;' : ''}">
+      ${tseed ? `<span style="color:${getSeedColor(tseed)};font-size:.65rem;min-width:14px;flex-shrink:0">${tseed}</span>` : '<span style="min-width:14px"></span>'}
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${tname}</span>
+      ${isWin ? '<span style="color:#4bc87a;font-size:.65rem;flex-shrink:0">✓</span>' : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderRegion(r) {
+  const col = REGION_COLORS[r];
+  const numGames = [8, 4, 2, 1];
+  let html = `<div style="background:#161616;border:1px solid #2a2a2a;border-radius:10px;padding:12px;overflow-x:auto">
+    <div style="font-size:.88rem;font-weight:700;color:${col};margin-bottom:8px">${REGION_NAMES[r]} Region</div>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:6px">`;
+
+  for (let round = 0; round < 4; round++) {
+    const ng = numGames[round];
+    html += `<div>
+      <div style="font-size:.62rem;color:#444;text-align:center;margin-bottom:5px;text-transform:uppercase">
+        ${['R64','R32','Sweet 16','Elite 8'][round]}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:${[4,12,30,72][round]}px">`;
+    for (let g = 0; g < ng; g++) {
+      html += `<div style="border:1px solid #2a2a2a;border-radius:5px;overflow:hidden;background:#111;min-height:46px">
+        ${renderMatchupBox(r, round, g)}
+      </div>`;
+    }
+    html += `</div></div>`;
+  }
+  html += `</div>`;
+
+  const rc = bW[r][3][0];
+  html += `<div style="margin-top:8px;padding:7px;background:${rc?'#1a2a1a':'#111'};border:1px solid ${rc?'#4bc87a':'#2a2a2a'};border-radius:6px;text-align:center">
+    <div style="font-size:.62rem;color:#555;margin-bottom:2px">${REGION_NAMES[r].toUpperCase()} CHAMPION</div>
+    <div style="color:${rc?'#4bc87a':'#444'};font-weight:700;font-size:.82rem">${rc || '—'}</div>
+  </div></div>`;
+  return html;
+}
+
+function renderFinalFour() {
+  const [eW, wW, sW, mW] = [bW[0][3][0],bW[1][3][0],bW[2][3][0],bW[3][3][0]].map(v=>v||'?');
+  const ff1ok = eW!=='?' && wW!=='?';
+  const ff2ok = sW!=='?' && mW!=='?';
+
+  const semiSlot = (label, teams, ffIdx) => `
+    <div style="background:#161616;border:1px solid #333;border-radius:8px;padding:10px;min-width:160px">
+      <div style="font-size:.65rem;color:#555;margin-bottom:6px;text-align:center">${label}</div>
+      ${teams.map(t => {
+        const isW = ffW[ffIdx] === t;
+        const canPick = (ffIdx===0?ff1ok:ff2ok) && t!=='?';
+        return `<div onclick="${canPick?`pickFF(${ffIdx},'${t.replace(/'/g,"\\'")}')`:''}"
+          style="padding:6px 10px;border-radius:5px;cursor:${canPick?'pointer':'default'};
+                 background:${isW?'#1a2a1a':'transparent'};
+                 color:${isW?'#4bc87a':t==='?'?'#383838':'#ddd'};
+                 font-size:.82rem;font-weight:600;display:flex;justify-content:space-between;align-items:center">
+          <span>${t}</span>${isW?'<span style="font-size:.7rem">✓</span>':''}
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  const champOk = ffW[0] && ffW[1];
+  return `<div style="margin-top:12px;background:#1a1a1a;border:2px solid #c8a84b;border-radius:12px;padding:14px">
+    <div style="text-align:center;font-size:.85rem;font-weight:700;color:#c8a84b;margin-bottom:12px">🏀 FINAL FOUR — San Antonio, TX · Apr 4 &amp; 6</div>
+    <div style="display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap">
+      ${semiSlot('SF1 · East vs West', [eW,wW], 0)}
+      <div style="text-align:center;min-width:140px">
+        <div style="font-size:.65rem;color:#555;margin-bottom:6px">CHAMPIONSHIP · Apr 6</div>
+        ${champOk ? [ffW[0],ffW[1]].map(t => {
+          const isW = champW === t;
+          return `<div onclick="pickChamp('${t.replace(/'/g,"\\'")}');"
+            style="padding:8px 12px;border-radius:6px;cursor:pointer;margin-bottom:5px;text-align:center;
+                   background:${isW?'#2a2200':'#111'};border:1px solid ${isW?'#c8a84b':'#333'};
+                   color:${isW?'#c8a84b':'#ddd'};font-size:.85rem;font-weight:700">
+            ${t}${isW?' 🏆':''}
+          </div>`;
+        }).join('') : `<div style="padding:16px;color:#383838;font-size:.78rem;text-align:center">Complete regions first</div>`}
+      </div>
+      ${semiSlot('SF2 · South vs Midwest', [sW,mW], 1)}
+    </div>
+    ${champW ? `<div style="margin-top:10px;text-align:center;padding:10px;background:#2a2200;border:1px solid #c8a84b;border-radius:8px">
+      <div style="font-size:1rem;font-weight:700;color:#c8a84b">🏆 ${champW}</div>
+      <div style="font-size:.72rem;color:#888;margin-top:2px">Your 2026 NCAA Champion Pick</div>
+    </div>` : ''}
+  </div>`;
+}
+
 function renderBracket() {
   const container = document.getElementById('bracket-container');
-  container.innerHTML = `
-    <div style="padding:40px;text-align:center;color:#555;grid-column:1/-1">
-      <div style="font-size:3rem;margin-bottom:12px">🏀</div>
-      <div style="font-size:1.1rem;color:#888;margin-bottom:8px">Bracket Available After Selection Sunday</div>
-      <div style="font-size:.82rem;color:#555">The official 2026 NCAA Tournament bracket will be revealed March 15 at 6 PM ET on CBS.</div>
-      <div style="margin-top:16px">
-        <button class="btn" onclick="runSimulation()">Simulate Tournament Now</button>
-        <button class="btn btn-secondary" style="margin-left:8px" onclick="showTab('teams')">View Team Ratings</button>
-      </div>
-      <div style="margin-top:20px;color:#444;font-size:.8rem">
-        Once the bracket is released, update the team seeds and regions here.<br>
-        Use the Matchup Predictor tab to analyze any first-round game.
-      </div>
+  let html = `<div class="card" style="padding:10px 14px;margin-bottom:10px">
+    <div class="card-title">First Four — Dayton, OH (Mar 17–18) · Click teams in bracket to advance them</div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;font-size:.8rem;color:#aaa">
+      <div><span style="color:#f0a84b">(11) West:</span> Texas vs NC State → winner plays BYU</div>
+      <div><span style="color:#f0a84b">(11) Midwest:</span> SMU vs Miami OH → winner plays Tennessee</div>
+      <div><span style="color:#f0a84b">(16) Midwest:</span> UMBC vs Howard → winner plays Michigan</div>
+      <div><span style="color:#f0a84b">(16) South:</span> Prairie View A&M vs Lehigh → winner plays Florida</div>
     </div>
-  `;
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+    ${REGION_NAMES.map((_,r) => renderRegion(r)).join('')}
+  </div>
+  ${renderFinalFour()}`;
+  container.innerHTML = html;
+}
+
+// ── SIMULATION ──
+function runSimulation() {
+  for (let r = 0; r < 4; r++) {
+    for (let round = 0; round < 4; round++) {
+      const ng = [8,4,2,1][round];
+      for (let g = 0; g < ng; g++) {
+        const teams = getMatchupTeams(r, round, g);
+        const n1 = teams[0][1], n2 = teams[1][1];
+        if (!n1 || !n2 || n1==='TBD' || n2==='TBD') continue;
+        const t1 = getTeamData(n1), t2 = getTeamData(n2);
+        bW[r][round][g] = Math.random() < winProbability(t1,t2) ? n1 : n2;
+      }
+    }
+  }
+  const [eW,wW,sW,mW] = [bW[0][3][0],bW[1][3][0],bW[2][3][0],bW[3][3][0]];
+  if (eW && wW) { const t1=getTeamData(eW),t2=getTeamData(wW); ffW[0]=Math.random()<winProbability(t1,t2)?eW:wW; }
+  if (sW && mW) { const t1=getTeamData(sW),t2=getTeamData(mW); ffW[1]=Math.random()<winProbability(t1,t2)?sW:mW; }
+  if (ffW[0]&&ffW[1]) { const t1=getTeamData(ffW[0]),t2=getTeamData(ffW[1]); champW=Math.random()<winProbability(t1,t2)?ffW[0]:ffW[1]; }
+  showTab('bracket');
+  renderBracket();
+  document.getElementById('bracket-status').innerHTML =
+    `<span style="color:#c8a84b">Simulation: <strong>🏆 ${champW||'—'}</strong> predicted champion. Run again for a new outcome.</span>`;
 }
 
 // ── TABS ──
