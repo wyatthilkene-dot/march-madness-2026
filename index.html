@@ -121,7 +121,8 @@ td{padding:7px 10px;border-bottom:1px solid #1e1e1e;vertical-align:middle}
   </div>
   <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
     <button class="btn btn-secondary" onclick="exportPDF()">Export PDF</button>
-    <button class="btn" onclick="runSimulation()">Simulate Tournament</button>
+    <button class="btn btn-secondary" onclick="loadSim1()">Load Sim #1</button>
+    <button class="btn" onclick="runSimulation()">New Simulation</button>
   </div>
 </div>
 
@@ -917,6 +918,38 @@ function runSimulation() {
     `<span style="color:#c8a84b">Simulation: <strong>🏆 ${champW||'—'}</strong> predicted champion. Run again for a new outcome.</span>`;
 }
 
+// ── SIMULATION #1 — Model's deterministic picks (highest composite wins) ──
+function loadSim1() {
+  // EAST: Duke's path to the Final Four
+  bW[0][0] = ["Duke","Ohio State","St. John's","Kansas","Louisville","Michigan St","UCLA","UConn"];
+  bW[0][1] = ["Duke","Kansas","Michigan St","UConn"];
+  bW[0][2] = ["Duke","UConn"];
+  bW[0][3] = ["Duke"];
+  // WEST: Arizona's path
+  bW[1][0] = ["Arizona","Utah State","Wisconsin","Arkansas","BYU","Gonzaga","Miami FL","Purdue"];
+  bW[1][1] = ["Arizona","Arkansas","Gonzaga","Purdue"];
+  bW[1][2] = ["Arizona","Purdue"];
+  bW[1][3] = ["Arizona"];
+  // SOUTH: Florida's path
+  bW[2][0] = ["Florida","Clemson","Vanderbilt","Nebraska","N Carolina","Illinois","St. Mary's","Houston"];
+  bW[2][1] = ["Florida","Nebraska","Illinois","Houston"];
+  bW[2][2] = ["Florida","Houston"];
+  bW[2][3] = ["Florida"];
+  // MIDWEST: Michigan's path
+  bW[3][0] = ["Michigan","Georgia","Texas Tech","Alabama","Tennessee","Virginia","Kentucky","Iowa State"];
+  bW[3][1] = ["Michigan","Alabama","Virginia","Iowa State"];
+  bW[3][2] = ["Michigan","Iowa State"];
+  bW[3][3] = ["Michigan"];
+  // Final Four: Duke vs Arizona, Florida vs Michigan
+  ffW[0] = "Duke";      // Duke over Arizona
+  ffW[1] = "Michigan";  // Michigan over Florida
+  champW = "Duke";      // Duke over Michigan 🏆
+  showTab('bracket');
+  renderBracket();
+  document.getElementById('bracket-status').innerHTML =
+    `<span style="color:#c8a84b">📊 Simulation #1 loaded — Model's top picks. Champion: <strong>🏆 Duke</strong></span>`;
+}
+
 // ── TABS ──
 function showTab(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -936,7 +969,7 @@ renderSummaryMetrics();
 renderTable();
 populateTeamSelects();
 renderSeedMatchups();
-renderBracket();
+loadSim1();        // Pre-load Simulation #1 picks
 renderHistoryChart();
 renderUpsets();
 </script>
